@@ -20,7 +20,10 @@ var User = db.Model.extend({
       var hash = bcrypt.hashSync(pw, salt);
       model.set('password', hash);
     });
+
   }
+
+
 
 
 

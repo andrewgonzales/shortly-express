@@ -53,6 +53,7 @@ function(req, res) {
 
   new Link({ url: uri }).fetch().then(function(found) {
     if (found) {//Already in database
+      console.log(found.attributes);
       res.send(200, found.attributes);
     } else {
 
@@ -86,7 +87,13 @@ function(req, res) {
 app.post('/login', function(req,res){
   var username = req.body.username;
   var password = req.body.password;
-  console.log(username, password);
+  new User({username: username}).fetch().then(function(found){
+    if (found){
+      console.log(found.attributes);
+      util.deCrypt(username, password);
+      res.status(200);
+    } else {}
+  });
 
   // console.log('logged in');
   //if (req.user){
@@ -108,14 +115,14 @@ app.post('/signup', function(req,res){
   var password = req.body.password;
   new User({username: username}).fetch().then(function(found){
     if (found) {
-
+      res.render('login');
     } else {  
       Users.create({
         username: username,
         password: password
       })
       .then(function(){
-        res.render('login');
+        res.render('/');
       
       });
     }
