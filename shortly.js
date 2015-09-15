@@ -12,7 +12,10 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 var cookieParser = require('cookie-parser');
 var session = require('express-session');
+var uuid = require('node-uuid');
 var app = express();
+
+var sess;
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -22,28 +25,53 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
-// app.use(cookieParser('Secret'));
-// app.use(session());
+app.use(cookieParser());
+app.use(session({
+        genid: function(req){
+          return uuid.v1();
+        },
+        secret: 'nyan cat', 
+        cookie: {maxAge: 30000}, 
+        resave: true, 
+        saveUninitialized: false}));
 
 app.get('/', 
 function(req, res) {
-  res.render('index');
+  sess = req.session;
+  if(sess.username){
+    res.render('index');
+  } else {
+    res.redirect('login');
+  }
+
 });
 
 app.get('/create', 
 function(req, res) {
-  res.render('index');
+  if(req.session.username){
+    res.render('index');
+  } else {
+
+    res.redirect('login');
+  }
 });
 
 app.get('/links', 
 function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.send(200, links.models);
-  });
+  sess = req.session;
+  if(sess.username){
+    Links.reset().fetch().then(function(links) {
+      res.send(200, links.models);
+    });
+  } else {
+    res.redirect('login');
+  }
+
 });
 
 app.post('/links', 
 function(req, res) {
+
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -53,7 +81,6 @@ function(req, res) {
 
   new Link({ url: uri }).fetch().then(function(found) {
     if (found) {//Already in database
-      console.log(found.attributes);
       res.send(200, found.attributes);
     } else {
 
@@ -81,25 +108,32 @@ function(req, res) {
 /************************************************************/
 app.get('/login', 
 function(req, res) {
-  res.render('login');
+  sess = req.session;
+  if(sess.username){
+    res.redirect('index');
+  } else {
+    res.render('login');
+  }
 });
 
 app.post('/login', function(req,res){
   var username = req.body.username;
   var password = req.body.password;
+  sess = req.session;
+  sess.username = req.body.username;
+  res.redirect('login');
+
   new User({username: username}).fetch().then(function(found){
-    if (found){
-      console.log(found.attributes);
+    if (found){ //in db
       util.deCrypt(username, password);
       res.status(200);
-    } else {}
+
+      //if(verified) //correct pw
+      // new session
+    } else {}  //username not in db, redirect to signup
   });
 
-  // console.log('logged in');
-  //if (req.user){
-    //go to index
-  //else
-    //go to login
+  //redirect to index
 });
  
 
@@ -109,7 +143,6 @@ function(req, res) {
 });
 
 app.post('/signup', function(req,res){
-  console.log('signed up');
   //Store username and hashed password into user table
   var username = req.body.username;
   var password = req.body.password;
