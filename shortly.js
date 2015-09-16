@@ -27,11 +27,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 app.use(cookieParser());
 app.use(session({
-        // genid: function(req){
-        //   return uuid.v1();
-        // },
         secret: 'nyan cat', 
-        cookie: {maxAge: 30000}, 
         resave: false, 
         saveUninitialized: true}));
 
@@ -107,6 +103,7 @@ app.post('/login', function(req,res){
       found.checkPassword(password, function(match){
         if(match) {
           util.createSession(req, res, found);
+
         } else {
           res.redirect('/login');  
         }
