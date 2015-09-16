@@ -4,7 +4,7 @@ var partials = require('express-partials');
 var bodyParser = require('body-parser');
 
 
-var db = require('./app/config');
+var db = require('./app/config')
 var Users = require('./app/collections/users');
 var User = require('./app/models/user');
 var Links = require('./app/collections/links');
@@ -27,50 +27,29 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 app.use(cookieParser());
 app.use(session({
-        genid: function(req){
-          return uuid.v1();
-        },
+        // genid: function(req){
+        //   return uuid.v1();
+        // },
         secret: 'nyan cat', 
         cookie: {maxAge: 30000}, 
-        resave: true, 
-        saveUninitialized: false}));
+        resave: false, 
+        saveUninitialized: true}));
 
-app.get('/', 
-function(req, res) {
-  sess = req.session;
-  if(sess.username){
+app.get('/', util.checkUser, function(req, res) {
     res.render('index');
-  } else {
-    res.redirect('login');
-  }
-
 });
 
-app.get('/create', 
-function(req, res) {
-  if(req.session.username){
+app.get('/create', util.checkUser, function(req, res) {
     res.render('index');
-  } else {
-
-    res.redirect('login');
-  }
 });
 
-app.get('/links', 
-function(req, res) {
-  sess = req.session;
-  if(sess.username){
-    Links.reset().fetch().then(function(links) {
-      res.send(200, links.models);
-    });
-  } else {
-    res.redirect('login');
-  }
-
+app.get('/links', util.checkUser, function(req, res) {
+  Links.reset().fetch().then(function(links) {
+    res.send(200, links.models);
+  });
 });
 
-app.post('/links', 
-function(req, res) {
+app.post('/links', util.checkUser, function(req, res) {
 
   var uri = req.body.url;
 
@@ -110,7 +89,7 @@ app.get('/login',
 function(req, res) {
   sess = req.session;
   if(sess.username){
-    res.redirect('index');
+    res.redirect('/index');
   } else {
     res.render('login');
   }
@@ -119,23 +98,34 @@ function(req, res) {
 app.post('/login', function(req,res){
   var username = req.body.username;
   var password = req.body.password;
-  sess = req.session;
-  sess.username = req.body.username;
-  res.redirect('login');
+  // sess = req.session;
+  // sess.username = req.body.username;
 
+  //Bookshelf will turn this into a SQL query using the where statement since we have fetch()
   new User({username: username}).fetch().then(function(found){
     if (found){ //in db
-      util.deCrypt(username, password);
-      res.status(200);
-
-      //if(verified) //correct pw
-      // new session
-    } else {}  //username not in db, redirect to signup
+      found.checkPassword(password, function(match){
+        if(match) {
+          util.createSession(req, res, found);
+        } else {
+          res.redirect('/login');  
+        }
+      });
+    } else {
+      res.redirect('/login')
+    }  //username not in db, redirect to signup
   });
 
   //redirect to index
 });
  
+app.get('/logout', function(req, res){
+  req.session.destroy(function(){
+    res.redirect('/login');
+  });
+});
+
+
 
 app.get('/signup', 
 function(req, res) {
@@ -148,15 +138,14 @@ app.post('/signup', function(req,res){
   var password = req.body.password;
   new User({username: username}).fetch().then(function(found){
     if (found) {
-      res.render('login');
+      res.redirect('/login');
     } else {  
-      Users.create({
+      var user = Users.create({
         username: username,
         password: password
       })
-      .then(function(){
-        res.render('/');
-      
+      .then(function(user){
+        util.createSession(req, res, user);
       });
     }
   });
